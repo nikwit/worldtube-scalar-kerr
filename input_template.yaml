@@ -1,0 +1,252 @@
+# Distributed under the MIT License.
+# See LICENSE.txt for details.
+
+# Executable: EvolveWorldtubeCurvedScalarWaveKerrSchild3D
+# Check: parse
+---
+---
+Parallelization:
+  ElementDistribution: NumGridPoints
+
+AnalyticData:
+  ZerothOrderPuncture:
+    ParticlePosition: {{particle_position}}
+    ParticleVelocity: {{particle_velocity}}
+    ParticleCharge: {{particle_charge}}
+
+BackgroundSpacetime:
+  KerrSchild:
+    Mass: 1.
+    Center: [0., 0., 0.]
+    Spin: [0., 0., 0.]
+    Velocity: [0., 0., 0.]
+
+ResourceInfo:
+  AvoidGlobalProc0: false
+  Singletons:
+    Spheres:
+      Proc: Auto
+      Exclusive: false
+    WorldtubeSingleton:
+      Proc: Auto
+      Exclusive: true
+
+PhaseChangeAndTriggers:
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 200000000
+          Offset: 0
+    PhaseChanges:
+      - CheckpointAndExitAfterWallclock:
+          WallclockHours: 23.75
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.000001
+  TimeStepper: Rk4Owren
+  MinimumTimeStep: 1e-10
+
+DomainCreator:
+  BinaryCompactObject:
+    InitialRefinement:
+      ObjectAShell: [1, 1, 2]
+      ObjectBShell: [1, 1, 1]
+      ObjectACube: [1, 1, 1]
+      ObjectBCube: [2, 2, 1]
+      Envelope: [1, 1, 4]
+      OuterShell: [1, 1, 5]
+    InitialGridPoints:
+      ObjectAShell: [{{10 + P}}, {{10 + P}}, {{11 + P}}]
+      ObjectBShell: [{{10 + P}}, {{10 + P}}, {{12 + P}}]
+      ObjectACube: [{{11 + P}}, {{11 + P}}, {{10+ P}}]
+      ObjectBCube: [{{10 + P}}, {{10 + P}}, {{11 + P}}]
+      Envelope: [{{12 + P}}, {{12 + P}}, {{12 + P}}]
+      OuterShell: [{{10 + P}}, {{10 + P}}, {{10 + P}}]
+    UseEquiangularMap: true
+    CenterOfMassOffset: [0.,0.]
+    ObjectB:
+      InnerRadius: 1.9
+      OuterRadius: 10.
+      XCoord: -1e-64
+      Interior:
+        ExciseWithBoundaryCondition: DemandOutgoingCharSpeeds
+      UseLogarithmicMap: true
+    ObjectA:
+      InnerRadius: {{worldtube_radius}}
+      OuterRadius: 10.
+      XCoord: {{orbit_radius}}
+      Interior:
+        ExciseWithBoundaryCondition: Worldtube
+      UseLogarithmicMap: true
+    Envelope:
+      RadialDistribution: Linear
+      Radius: 400.
+    OuterShell:
+      Radius: 900.
+      RadialDistribution: Linear
+      OpeningAngle: 120.0
+      BoundaryCondition: ConstraintPreservingSphericalRadiation
+    CubeScale: 1.0
+    TimeDependentMaps:
+      InitialTime: 0.
+      ExpansionMap:
+        InitialValues: [1., 0., 0.]
+        AsymptoticVelocityOuterBoundary: 0.
+        DecayTimescaleOuterBoundary: 1.
+      TranslationMap: None
+      RotationMap:
+        InitialAngularVelocity: [0., 0., {{angular_vel}}]
+      SkewMap: None
+      ShapeMapA:
+        LMax: 2
+        InitialValues: Spherical
+        SizeInitialValues: [0.0, 0.0, 0.0]
+        TransitionEndsAtCube: true      
+      ShapeMapB:
+        LMax: 2
+        InitialValues: Spherical
+        SizeInitialValues: [0.0, 0.0, 0.0]
+        TransitionEndsAtCube: true
+
+SpatialDiscretization:
+  BoundaryCorrection:
+    UpwindPenalty:
+  DiscontinuousGalerkin:
+    Formulation: StrongInertial
+    Quadrature: GaussLobatto
+
+EventsAndTriggersAtSlabs:
+  - Trigger:
+      InsideHorizon:
+    Events:
+      - ObserveFields:
+          SubfileName: InsideHorizon
+          VariablesToObserve:
+            - Psi
+            - Pi
+            - Phi
+            - OneIndexConstraint
+          InterpolateToMesh: None
+          CoordinatesFloatingPointType: Double
+          FloatingPointTypes: [Double]
+          BlocksToObserve: All
+      - Completion
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: {{observe_volume_interval}}
+          Offset: 0
+    Events:
+      - ObserveFields:
+          SubfileName: Volume
+          VariablesToObserve:
+            - Psi
+            - OneIndexConstraint
+          InterpolateToMesh: None
+          CoordinatesFloatingPointType: Float
+          FloatingPointTypes: [Float]
+          BlocksToObserve: All
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: {{observe_spheres_interval}}
+          Offset: 0
+    Events:
+      - Spheres
+  - Trigger:
+      Slabs:
+        Specified: 
+          Values: [0]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 1.6
+  - Trigger:
+      OrbitRadius:
+          Radii: [100., 90., 80.]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 1.6
+  - Trigger:
+      OrbitRadius:
+          Radii: [ 70., 60., 55., 52.,  50., 48., 45., 42., 40.]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 1.4
+  - Trigger:
+      OrbitRadius:
+          Radii: [38., 36., 34., 32., 30., 28., 26., 24., 22., 20., 19., 18., 17., 16., 15., 13.5, 13., 12.5, 12., 11.5, 11., 10.5, 10., 9.5, 9., 8.5, 8., 7.5,7., 6.75, 6.5, 6.25, 6., 5.75, 5.5, 5.25,  5., 4.75, 4.5, 4.25, 4., 3.75, 3.5, 3.25]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 2.3
+  - Trigger:
+      OrbitRadius:
+          Radii: [3., 2.75, 2.5, 2.25, 2.1, 2.05, 2., 1.9, 1.8, 1.75, 1.7, 1.65, 1.6]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 0.5
+  - Trigger:
+      OrbitRadius:
+          Radii: [1.7]
+    Events:
+      - Completion
+
+Worldtube:
+  ExcisionSphere: ExcisionSphereA
+  ExpansionOrder: {{expansion_order}}
+  SelfForceOptions:
+    Iterations: {{iterations}}
+    Mass: {{particle_charge}}
+    TurnOnTime: {{turn_on_time}}
+    TurnOnInterval: {{turn_on_interval}}
+  Charge: {{particle_charge}}
+  WorldtubeRadiusOptions:
+    Amplitude: {{amp}}
+    TransitionRadius: {{rb}}
+    TransitionWidth: {{delta}}
+    Exponent: {{exp}}
+  BlackHoleRadiusOptions:
+    Amplitude: {{amp_bh}}
+    TransitionRadius: {{rb_bh}}
+    TransitionWidth: {{delta_bh}}
+    Exponent: {{exp_bh}}
+  ObserveCoefficientsTrigger:
+    Slabs:
+      EvenlySpaced:
+        Interval: {{ylm_obs_interval}}
+        Offset: 0
+InterpolationTargets:
+  Spheres:
+    LMax: 10
+    Center: [0.,0.,0.]
+    Radius: [500., 800.]
+    AngularOrdering: Strahlkorper
+
+Filtering:
+  ExpFilter0:
+    Alpha: 12
+    HalfPower: 32
+    Enable: true
+    BlocksToFilter: All
+
+EventsAndDenseTriggers:
+
+Observers:
+  VolumeFileName: "Volume"
+  ReductionFileName: "Reductions"
+  SurfaceFileName: "Surface"
