@@ -1,0 +1,63 @@
+diff --git a/src/Evolution/DiscontinuousGalerkin/DgElementArray.hpp b/src/Evolution/DiscontinuousGalerkin/DgElementArray.hpp
+index e79b672d34..393ae33195 100644
+--- a/src/Evolution/DiscontinuousGalerkin/DgElementArray.hpp
++++ b/src/Evolution/DiscontinuousGalerkin/DgElementArray.hpp
+@@ -128,6 +128,7 @@ void DgElementArray<Metavariables, PhaseDepActionList>::allocate_array(
+   const size_t num_of_procs_to_use = number_of_procs - procs_to_ignore.size();
+ 
+   const auto& blocks = domain.blocks();
++  const auto& worldtube = domain.excision_spheres().at("ExcisionSphereA");
+ 
+   Parallel::create_elements_using_distribution(
+       [&dg_element_array, &global_cache, &initialization_items](
+@@ -136,8 +137,8 @@ void DgElementArray<Metavariables, PhaseDepActionList>::allocate_array(
+         dg_element_array(element_id)
+             .insert(global_cache, initialization_items, target_proc);
+       },
+-      element_weight, blocks, initial_extents, initial_refinement_levels,
+-      quadrature,
++      element_weight, blocks, worldtube, initial_extents,
++      initial_refinement_levels, quadrature,
+ 
+       procs_to_ignore, number_of_procs, number_of_nodes, num_of_procs_to_use,
+       local_cache, true);
+diff --git a/src/Parallel/CreateElementsUsingDistribution.hpp b/src/Parallel/CreateElementsUsingDistribution.hpp
+index 64fcbd3efb..17f2c88034 100644
+--- a/src/Parallel/CreateElementsUsingDistribution.hpp
++++ b/src/Parallel/CreateElementsUsingDistribution.hpp
+@@ -13,6 +13,7 @@
+ 
+ #include "Domain/Block.hpp"
+ #include "Domain/ElementDistribution.hpp"
++#include "Domain/ExcisionSphere.hpp"
+ #include "Domain/Structure/ElementId.hpp"
+ #include "Parallel/DomainDiagnosticInfo.hpp"
+ #include "Parallel/GlobalCache.hpp"
+@@ -30,6 +31,7 @@ template <typename F, size_t Dim, typename Metavariables>
+ void create_elements_using_distribution(
+     const F& func, const std::optional<domain::ElementWeight>& element_weight,
+     const std::vector<Block<Dim>>& blocks,
++    const ::ExcisionSphere<Dim>& worldtube,
+     const std::vector<std::array<size_t, Dim>>& initial_extents,
+     const std::vector<std::array<size_t, Dim>>& initial_refinement_levels,
+     const Spectral::Quadrature quadrature,
+@@ -44,10 +46,18 @@ void create_elements_using_distribution(
+   // robin.
+   domain::BlockZCurveProcDistribution<Dim> element_distribution{};
+   if (element_weight.has_value()) {
+-    const std::unordered_map<ElementId<Dim>, double> element_costs =
++    std::unordered_map<ElementId<Dim>, double> element_costs =
+         domain::get_element_costs(blocks, initial_refinement_levels,
+                                   initial_extents, element_weight.value(),
+                                   quadrature);
++    for (const auto& [id, weight] : element_costs) {
++      if (worldtube.abutting_direction(id).has_value()) {
++        element_costs[id] *= 8.;
++      }
++      if (blocks[id.block_id()].has_distorted_frame()) {
++        element_costs[id] *= 1.2;
++      }
++    }
+     element_distribution = domain::BlockZCurveProcDistribution<Dim>{
+         element_costs,   num_of_procs_to_use, blocks, initial_refinement_levels,
+         initial_extents, procs_to_ignore};

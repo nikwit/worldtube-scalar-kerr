@@ -35,7 +35,7 @@ source $SPECTRE_HOME/env/bin/activate
 Next, create a build directory called e.g. worldtube-build. From it, you can now run CMake to configure your installation.A sensible example command would be (make sure to replace PATH_TO_YOUR_SPECTRE_DIRECTORY):
 
 ```
-cmake -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++ -D CMAKE_Fortran_COMPILER=gfortran -D CHARM_ROOT=/u/guilara/charm_impi_3/mpi-linux-x86_64-smp -D CMAKE_BUILD_TYPE=Release -D DEBUG_SYMBOLS=ON -D BUILD_SHARED_LIBS=ON -D MEMORY_ALLOCATOR=JEMALLOC -D BUILD_PYTHON_BINDINGS=ON -D Python_EXECUTABLE=/u/guilara/repos/spectre/env/bin/python -D Catch2_DIR=/u/guilara/repos/Catch2/install_dir/lib64/cmake/Catch2 -D MPI_C_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpigcc -D MPI_CXX_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpig++ -D MPI_Fortran_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpigfortran PATH_TO_YOUR_SPECTRE_DIRECTORY -G Ninja
+cmake -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++ -D CMAKE_Fortran_COMPILER=gfortran -D CHARM_ROOT=/u/guilara/charm_impi_3/mpi-linux-x86_64-smp -D CMAKE_BUILD_TYPE=Release -D DEBUG_SYMBOLS=ON -D BUILD_SHARED_LIBS=ON -D MEMORY_ALLOCATOR=SYSTEM -D BUILD_PYTHON_BINDINGS=ON -D Python_EXECUTABLE=/u/guilara/repos/spectre/env/bin/python -D Catch2_DIR=/u/guilara/repos/Catch2/install_dir/lib64/cmake/Catch2 -D MPI_C_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpigcc -D MPI_CXX_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpig++ -D MPI_Fortran_COMPILER=/mpcdf/soft/SLE_15/packages/skylake/impi/gcc_11-11.2.0/2021.7.1/bin/mpigfortran PATH_TO_YOUR_SPECTRE_DIRECTORY -G Ninja
 ```
 
 To build the worldtube project, simply run:
@@ -98,21 +98,41 @@ For more complicated orbits, I usually set the apoapsis and the semi-latus rectu
 ### Excision sphere radii
 The radii of the excision spheres are changed dynamically according to equation 3 of our recent [letter](https://arxiv.org/pdf/2410.22290), corresponding to a smoothly broken power law where the excision spheres do not grow indefinitely but approach an asymptotic value. The transition radius is given by the parameter r0 (sometimes called rb) which is not very intuitive. The script therefore determines the value of r0 based on the desired worldtube radius at the ISCO. This is also done using a root search.
 
-## Speed up hack
+## Restarting a simulation
+On urania, simulations can only go for at most 24 hours. The executable will therefore write a checkpoint just before that time and cancel the job. To restart a simulation, it is easiest to use the `restart_job.py` script and simply running `python restart_job.py /path/to/simulation`. 
 
+
+## Analyzing a simulation
+The simulations are in general analyzed with python. First, the python bindings have to be compiled using `ninja all-pybindings`. The libraries created then have to be added to your `PYTHONPATH` so python knows where to look for them. The path is given by `your_build_directory/bin/python`. 
+
+I have included a script that contains a bunch of functions that may or may not be useful for the analysis of the simulations. Most important are the functions `extract_sim_data` which returns a large dictionary of the data collected about the particle and the self force as well as `extract_sphere_data` which computes the spherical harmonic modes. These are given in Spherepack format and the expected modes can be computed using the function `ylm`.
+
+
+## Speed up hack
+It is possible to accelerate the worldtube simulations by making sure that the elements neighboring the worldtube get more weight when they are distributed to the cores of the cluster. Unfortunately, this is rather hacky and I cannot include this on the main spectre branch. I have therefore included a patch `speedup.patch` that can be applied before compiling and should speed up the simulation by a factor of ~2.
+
+
+## Understanding the executable
+Getting the scalar charge orbit to work on Kerr orbits involves actually changing (and understanding) the executable.
+
+A good place to understand how the worldtube executable functions is to consider the actions that the worldtube and the elements are doing each time step. This is given by a compile time list called `step_actions`. For the worldtube these are listed in `SingletonChare.hpp` and for the elements they are listed in `EvolveWorldtubeCurvedScalarWave.hpp`. The algorithm they follow is described in this [paper](https://arxiv.org/abs/2403.08864). It is probably a good idea to read at least the comments of all of the `ElementActions` and `SingletonActions` in the `src/Evolution/Systems/CurvedScalarWave/Worldtube/` folder. 
 
 # Notes on Kerr
-Getting the scalar charge orbit to work on Kerr orbits involves actually changing the executable. Starting off 
 
-## Generating the puncture field
-The Puncture field is computed in the `PunctureField.hpp` file. 
+## The puncture field
+Moving from Schwarzschild to Kerr is mostly a matter of adjusting the puncture field. On the C++ side, this is computed in the `PunctureField.hpp` file. The puncture field is a function of the particle's coordinate position and time derivatives of it and is evaluated on the worldtube boundary.
+
+It is subtracted from the numerical field to obtain the regular field which is then send to the worldtube. This happens in `SendToWorldtube.hpp`. It then gets iterated to compute the acceleration in `IteratePunctureField.hpp`. Finally, it gets added on back to the regular field to create boundary conditions for the domain in `ReceiveWorldtubeData.hpp`.
+
+If the self force is turned on, the particle is no longer moving on a geodesic and the puncture field requires the so-called acceleration terms which are added to the puncture field, see `IteratePunctureField.hpp`. These terms need more functions that are computed such as the self force data which is calculated by the worldtube in `IterateAccelerationTerms.hpp` and sent to the neighboring elements which compute the updated puncture field.
+
+### Generating a new puncture field
 
 
-
-## Geodesic Case
-
-## Self Force acceleration
+## Derivatives of Kerr Metric
+The additional acceleration terms require computation of the metric derivatives. These are used to compute the acceleration terms in `IterateAccelerationTerms.hpp` The derivatives are computed in `KerrSchildDerivatives.cpp` and need to be adjusted to include the spin of the central black hole. Take a look at `Test_KerrSchildDerivatives.cpp` for a unit test that checks the analytic derivatives against a numerical derivative.
 
 
-# Notes on 2nd Order
+## Generic Orbits
+At the moment, the orbit is fixed in the equatorial plane. The worldtube excision sphere is via through a series of time dependent coordinate maps. In `UpdateFunctionsOfTime`, the functions of time controlling these maps are set according to the integrated worldtube position and velocity each time step. In `Test_UpdateFunctionsOfTime`, it is checked that providing the position and velocity of the particle to this action correctly moves the excision sphere. The `UpdateFunctionsOfTime` therefore need to be generalized to work for any position and velocity outside the equatorial plane. I think this can just be done by changing the `Rotation` function of time. The test can be readily adjusted to ensure that this works as intended.
 
