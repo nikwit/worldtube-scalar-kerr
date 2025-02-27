@@ -44,9 +44,9 @@ To build the worldtube project, simply run:
 ninja EvolveWorldtubeCurvedScalarWaveKerrSchild3D -j 32
 ```
 
-## The launch script
+## The slurm launch template
 
-First of all, you will need a launch script. I have included a sample launch script that should be usable called `launch_template.sh`. 
+To run the worldtube executable, you will need a slurm launch template. I have included a sample template that should be usable called `launch_template.sh`. 
 You will have to adjust these lines for it work:
 
 ```
@@ -54,7 +54,7 @@ export SPECTRE_HOME=/path/to/my/spectre/home
 export SPECTRE_BUILD_DIR=/path/to/my/build/directory
 ```
 
-The number of nodes and timeout is controlled right at the beginning of the script:
+The number of nodes and timeout is controlled right at the beginning of the template:
 
 ```
 #SBATCH --nodes 2
@@ -77,7 +77,7 @@ I will briefly summarize some of the most important options here:
  
 - `IntialGridPoints`: Gives the initial p-refinements of the BinaryCompactObject domain. These are computed based on the `P` set by the python script. In general P of 0 or even -1 is a good place to start. Note that if the very last value (the number of grid points in the radial direction in the outermost shell) is set to a value larger than 12, the outer boundary can become unstable. If this should be necessary, simply use more h refinement there, though it is already fairly high
 
-- `ObjectA/B`: Settings for the excision spheres. The inner radius corresponds to the initial excision radius. The excision spheres are surrounded by spheres with radius `OuterRadius` which are in turn surrounded by cubes with side length equal to the initial orbital radius. The outer radius should therefore be chosen to be roughly in the middle of the inner radius and half of the initial orbital radius.
+- `ObjectA/B`: Settings for the excision spheres. The inner radius corresponds to the initial excision radius. The excision spheres are surrounded by spheres with radius `OuterRadius` which are in turn surrounded by cubes with side length equal to the initial orbital radius. The value of the outer radius should therefore be chosen to be roughly in between the inner radius and half of the initial orbital radius, so that the surrounding spheres to pierce the cube.
 
 - `Envelope` and `OuterShell`: These are the spheres surrounding the black hole and scalar charge. The radii can be adjusted according to the required orbit.
 
@@ -85,7 +85,7 @@ I will briefly summarize some of the most important options here:
 
 - `InterpolationTargets`: Here we set up the observation of the waveform. The `Spheres` target observes the scalar field Psi on different extraction spheres and writes them to file. In postprocessing, we can then compute the different spherical harmonics. Th `LMax` will give you the accuracy of the spherical harmonic projection, corresponding to the amount of collocation points that will be written to file on each extraction sphere. Even if you only want to observe the first 2 or 3 modes you will need to give a higher `LMax` to accurately resolve the lower modes. The `Radii` gives the different radii of the extraction spheres. I have found that giving radii close to the outer boundary can lead to data not being written to file for longer periods during the simulation so this should probably be avoided.
 
-## The launch file
+## The launch script
 The launch file that will actually run a job is given by `launch_runs.py`. It creates a new directory and copies in the filled out templates of the submit script and the input file. Most important is the `config_dict` in the function `submit_job`. It contains all the parameters in the input file that were not set but will be set by jinja. I added some small comments to what each of them mean.
 
 At the moment it is set up to run the eccentric orbit given in Figure 2 of our recent [letter](https://arxiv.org/pdf/2410.22290).
@@ -98,14 +98,17 @@ For more complicated orbits, I usually set the apoapsis and the semi-latus rectu
 ### Excision sphere radii
 The radii of the excision spheres are changed dynamically according to equation 3 of our recent [letter](https://arxiv.org/pdf/2410.22290), corresponding to a smoothly broken power law where the excision spheres do not grow indefinitely but approach an asymptotic value. The transition radius is given by the parameter r0 (sometimes called rb) which is not very intuitive. The script therefore determines the value of r0 based on the desired worldtube radius at the ISCO. This is also done using a root search.
 
+## Running a simulation
+Create a new directory on urania. Ideal for this is `/urania/ptmp/`, do not use your home directory which is too small. Copy the launch script, the input template and the launch script into that directory. With all the modules loaded, simply run `python launch_runs.py`. 
+
 ## Restarting a simulation
-On urania, simulations can only go for at most 24 hours. The executable will therefore write a checkpoint just before that time and cancel the job. To restart a simulation, it is easiest to use the `restart_job.py` script and simply running `python restart_job.py /path/to/simulation`. 
+On urania, simulations can only go run at most 24 hours. The executable will therefore write a checkpoint just before that time. To restart a simulation, it is easiest to use the `restart_job.py` script and simply running `python restart_job.py /path/to/simulation`. 
 
 
 ## Analyzing a simulation
-The simulations are in general analyzed with python. First, the python bindings have to be compiled using `ninja all-pybindings`. The libraries created then have to be added to your `PYTHONPATH` so python knows where to look for them. The path is given by `your_build_directory/bin/python`. 
+The simulations are in analyzed with python bindings. First, the bindings have to be compiled using `ninja all-pybindings` in your build directory. The libraries created then have to be added to your `PYTHONPATH` so python knows where to look for them. The path is given by `your_build_directory/bin/python`. 
 
-I have included a script that contains a bunch of functions that may or may not be useful for the analysis of the simulations. Most important are the functions `extract_sim_data` which returns a large dictionary of the data collected about the particle and the self force as well as `extract_sphere_data` which computes the spherical harmonic modes. These are given in Spherepack format and the expected modes can be computed using the function `ylm`.
+I have also included a script that contains a bunch of functions that may or may not be useful for the analysis of the simulations. Most important are the functions `extract_sim_data` which returns a large dictionary of the data collected about the particle and the self force as well as `extract_sphere_data` which computes the spherical harmonic modes. These are given in Spherepack format and the expected modes can be computed using the function `ylm`.
 
 
 ## Speed up hack
