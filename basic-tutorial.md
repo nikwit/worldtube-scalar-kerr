@@ -57,11 +57,11 @@ export SPECTRE_BUILD_DIR=/path/to/my/build/directory
 The number of nodes and timeout is controlled right at the beginning of the template:
 
 ```
-#SBATCH --nodes 2
+#SBATCH --nodes {{num_nodes}}
 #SBATCH -t 4:00:00
 ```
 
-Note that this currently uses the debug queue on urania and can therefore only use 2 nodes for a maximum of 2 hours. To use the regular queue, simply delete the line `#SBATCH -p p.debug`.
+Note that this currently uses the debug queue on urania and can therefore only use 2 nodes for a maximum of 4 hours. To use the regular queue, simply delete the line `#SBATCH -p p.debug`.
 
 ## The input template
 
@@ -99,7 +99,7 @@ For more complicated orbits, I usually set the apoapsis and the semi-latus rectu
 The radii of the excision spheres are changed dynamically according to equation 3 of our recent [letter](https://arxiv.org/pdf/2410.22290), corresponding to a smoothly broken power law where the excision spheres do not grow indefinitely but approach an asymptotic value. The transition radius is given by the parameter r0 (sometimes called rb) which is not very intuitive. The script therefore determines the value of r0 based on the desired worldtube radius at the ISCO. This is also done using a root search.
 
 ## Running a simulation
-Create a new directory on urania. Ideal for this is `/urania/ptmp/`, do not use your home directory which is too small. Copy the launch script, the input template and the launch script into that directory. With all the modules loaded, simply run `python launch_runs.py`. 
+Create a new directory on urania. Ideal for this is `/urania/ptmp/`, do not use your home directory which is too small. Copy the slurm template, the input template and the launch script into that directory. With all the modules loaded, simply run `python launch_runs.py`. 
 
 ## Restarting a simulation
 On urania, simulations can only go run at most 24 hours. The executable will therefore write a checkpoint just before that time. To restart a simulation, it is easiest to use the `restart_job.py` script and simply running `python restart_job.py /path/to/simulation`. 
@@ -118,7 +118,7 @@ It is possible to accelerate the worldtube simulations by making sure that the e
 ## Understanding the executable
 Getting the scalar charge orbit to work on Kerr orbits involves actually changing (and understanding) the executable.
 
-A good place to understand how the worldtube executable functions is to consider the actions that the worldtube and the elements are doing each time step. This is given by a compile time list called `step_actions`. For the worldtube these are listed in `SingletonChare.hpp` and for the elements they are listed in `EvolveWorldtubeCurvedScalarWave.hpp`. The algorithm they follow is described in this [paper](https://arxiv.org/abs/2403.08864). It is probably a good idea to read at least the comments of all of the `ElementActions` and `SingletonActions` in the `src/Evolution/Systems/CurvedScalarWave/Worldtube/` folder. 
+A good place to understand how the worldtube executable functions is to consider the actions that the worldtube and the elements are doing each time step. This is given by a compile time list called `step_actions`. For the worldtube these are listed in `SingletonChare.hpp` and for the elements they are listed in `EvolveWorldtubeCurvedScalarWave.hpp`. The algorithm they follow is described in this [paper](https://arxiv.org/abs/2403.08864). It is probably a good idea to read at least the comments of all of the `ElementActions` and `SingletonActions` in the `src/Evolution/Systems/CurvedScalarWave/Worldtube/` directory which contains all the worldtube specific actions.
 
 # Notes on Kerr
 
