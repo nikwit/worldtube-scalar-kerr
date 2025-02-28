@@ -35,7 +35,7 @@ PhaseChangeAndTriggers:
   - Trigger:
       Slabs:
         EvenlySpaced:
-          Interval: 200000000
+          Interval: 5000
           Offset: 0
     PhaseChanges:
       - CheckpointAndExitAfterWallclock:
