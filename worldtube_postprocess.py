@@ -1,13 +1,9 @@
 import numpy as np
 import os
-import sys
-
-sys.path.append("/u/nwittek/build-pybindings/bin/python")
-
 import yaml
 import spectre.IO.H5 as spectre_h5
 from spectre.SphericalHarmonics import Spherepack, SpherepackIterator
-from scipy.interpolate import InterpolatedUnivariateSpline
+
 
 def spacetime_metric(position):
     radii = np.linalg.norm(position, axis=1)
@@ -26,18 +22,20 @@ def spacetime_metric(position):
 def lorentz_factor(position, velocity):
     metric = spacetime_metric(position)
     u0sq = -1 / (
-        metric[:,0,0]
+        metric[:, 0, 0]
         + 2.0 * np.einsum("...i,...i->...", metric[:, 0, 1:], velocity)
         + np.einsum("...jk,...j,...k->...", metric[:, 1:, 1:], velocity, velocity)
     )
     return np.sqrt(u0sq)
 
+
 def ylm(data, l, m, l_max):
     iterator = SpherepackIterator(l_max, l_max)
-    iterator.set(l,m)
+    iterator.set(l, m)
     harmonic = data[:, iterator()]
-    sign = 1 if abs(m)%2 ==0 else -1
-    return np.sqrt(np.pi / 2.) * sign * harmonic
+    sign = 1 if abs(m) % 2 == 0 else -1
+    return np.sqrt(np.pi / 2.0) * sign * harmonic
+
 
 def extract_sphere_data(file_name):
     with spectre_h5.H5File(f"{file_name}/Surface.h5") as f:
@@ -45,16 +43,20 @@ def extract_sphere_data(file_name):
 
         l_max = input_data["InterpolationTargets"]["Spheres"]["LMax"]
         radii = input_data["InterpolationTargets"]["Spheres"]["Radius"]
-        spherepack = Spherepack(l_max,l_max)
+        spherepack = Spherepack(l_max, l_max)
         physical_size = spherepack.physical_size
         spectral_size = spherepack.spectral_size
         sphere_file = f.get_vol("/Spheres")
         obs_ids = sphere_file.list_observation_ids()
         all_spectral_data = np.empty((len(radii), len(obs_ids), spectral_size))
         for k, id in enumerate(obs_ids):
-            data_all_radii = np.asarray(sphere_file.get_tensor_component(id, "Psi").data)
+            data_all_radii = np.asarray(
+                sphere_file.get_tensor_component(id, "Psi").data
+            )
             for i, radius in enumerate(radii):
-                data_radius = data_all_radii[i * physical_size : (i+1) * physical_size]
+                data_radius = data_all_radii[
+                    i * physical_size : (i + 1) * physical_size
+                ]
                 spectral_data = spherepack.phys_to_spec(data_radius)
                 all_spectral_data[i, k, :] = spectral_data
         times = np.asarray([sphere_file.get_observation_value(id) for id in obs_ids])
@@ -66,30 +68,46 @@ def extract_sphere_data(file_name):
             obs_ids = sphere_file.list_observation_ids()
             all_spectral_data_new = np.empty((len(radii), len(obs_ids), spectral_size))
             for k, id in enumerate(obs_ids):
-                data_all_radii = np.asarray(sphere_file.get_tensor_component(id, "Psi").data)
+                data_all_radii = np.asarray(
+                    sphere_file.get_tensor_component(id, "Psi").data
+                )
                 for i, radius in enumerate(radii):
-                    data_radius = data_all_radii[i * physical_size : (i+1) * physical_size]
+                    data_radius = data_all_radii[
+                        i * physical_size : (i + 1) * physical_size
+                    ]
                     spectral_data = spherepack.phys_to_spec(data_radius)
                     all_spectral_data_new[i, k, :] = spectral_data
-            times_new = np.asarray([sphere_file.get_observation_value(id) for id in obs_ids])
-        all_spectral_data = np.concatenate((all_spectral_data, all_spectral_data_new), axis = 1)
-        times = np.concatenate((times, times_new), axis = 0)
-        restart_index +=1
+            times_new = np.asarray(
+                [sphere_file.get_observation_value(id) for id in obs_ids]
+            )
+        all_spectral_data = np.concatenate(
+            (all_spectral_data, all_spectral_data_new), axis=1
+        )
+        times = np.concatenate((times, times_new), axis=0)
+        restart_index += 1
     if os.path.exists(f"{file_name}/ringdown/Surfaces.h5"):
         with spectre_h5.H5File(f"{file_name}/ringdown/Surfaces.h5") as f:
             sphere_file = f.get_vol("/Spheres")
             obs_ids = sphere_file.list_observation_ids()
             all_spectral_data_new = np.empty((len(radii), len(obs_ids), spectral_size))
             for k, id in enumerate(obs_ids):
-                data_all_radii = np.asarray(sphere_file.get_tensor_component(id, "Psi").data)
+                data_all_radii = np.asarray(
+                    sphere_file.get_tensor_component(id, "Psi").data
+                )
                 for i, radius in enumerate(radii):
-                    data_radius = data_all_radii[i * physical_size : (i+1) * physical_size]
+                    data_radius = data_all_radii[
+                        i * physical_size : (i + 1) * physical_size
+                    ]
                     spectral_data = spherepack.phys_to_spec(data_radius)
                     all_spectral_data_new[i, k, :] = spectral_data
-            times_new = np.asarray([sphere_file.get_observation_value(id) for id in obs_ids])
+            times_new = np.asarray(
+                [sphere_file.get_observation_value(id) for id in obs_ids]
+            )
             times_new += times[-1]
-        all_spectral_data = np.concatenate((all_spectral_data, all_spectral_data_new), axis = 1)
-        times = np.concatenate((times, times_new), axis = 0)
+        all_spectral_data = np.concatenate(
+            (all_spectral_data, all_spectral_data_new), axis=1
+        )
+        times = np.concatenate((times, times_new), axis=0)
     return times, all_spectral_data, radii
 
 
@@ -117,8 +135,7 @@ def extract_sim_data(file_name):
     ]["Interval"]
     times = coef_data[:, 0]
     time_steps = (times[1:] - times[:-1]) / obs_interval
-    charge = input_data["Worldtube"]["ParticleCharge"]
-    mass = input_data["Worldtube"]["Mass"]
+    charge = input_data["Worldtube"]["Charge"]
     position = coef_data[:, 1:4]
     radii = np.linalg.norm(position, axis=1)
     velocity = coef_data[:, 4:7]
@@ -162,17 +179,19 @@ def extract_sim_data(file_name):
     dr = np.cos(phases) * dx + np.sin(phases) * dy
     dphi = radii * (-np.sin(phases) * dx + np.cos(phases) * dy)
 
-    time_killing = np.asarray([-1.,0.,0.,0.])
+    time_killing = np.asarray([-1.0, 0.0, 0.0, 0.0])
     metric = spacetime_metric(position)
     u0 = lorentz_factor(position, velocity)
     ui = np.einsum("...i,...->...i", velocity, u0)
-    u = np.concatenate((np.asarray([u0]).T, ui), axis = 1)
+    u = np.concatenate((np.asarray([u0]).T, ui), axis=1)
     azimuthal_killing = np.zeros_like(u)
-    azimuthal_killing[:,1] = -position[:,1]
-    azimuthal_killing[:,2] = position[:,0]
+    azimuthal_killing[:, 1] = -position[:, 1]
+    azimuthal_killing[:, 2] = position[:, 0]
 
     energy = np.einsum("...ij,...i,j->...", metric, u, time_killing)
     ang_mom = np.einsum("...ij,...i,...j->...", metric, u, azimuthal_killing)
+
+    self_force_options = input_data["Worldtube"]["SelfForceOptions"]
     sim_info = {
         "times": coef_data[:, 0],
         "position": position,
@@ -181,17 +200,9 @@ def extract_sim_data(file_name):
         "angular_vel": angular_vel,
         "radial_vel": radial_vel,
         "acceleration": acceleration,
-        "turn_on_time": input_data["Worldtube"]["SelfForceOptions"]["TurnOnTime"],
-        "iterations": input_data["Worldtube"]["Iterations"],
-        "turn_on_interval": input_data["Worldtube"]["TurnOnInterval"],
         "psi0": coef_data[:, 10],
         "time_steps": time_steps,
         "charge": charge,
-        "mass": mass,
-        "eps": charge**2 / mass,
-        "wt_radius": input_data["DomainCreator"]["BinaryCompactObject"]["ObjectA"][
-            "InnerRadius"
-        ],
         "radial_acc": radial_acc,
         "angular_acc": angular_acc,
         "phases": phases,
@@ -204,10 +215,24 @@ def extract_sim_data(file_name):
         "all_coef_data": coef_data,
         "energy": energy,
         "angular_momentum": ang_mom,
-        "u0": u0
+        "u0": u0,
+        "turn_on_time": (
+            self_force_options["TurnOnTime"] if self_force_options is not None else None
+        ),
+        "iterations": (
+            self_force_options["Iterations"] if self_force_options is not None else None
+        ),
+        "turn_on_interval": (
+            self_force_options["TurnOnInterval"]
+            if self_force_options is not None
+            else None
+        ),
+        "mass": self_force_options["Mass"] if self_force_options is not None else None,
+        "wt_radius": input_data["DomainCreator"]["BinaryCompactObject"]["ObjectA"][
+            "InnerRadius"
+        ],
     }
     return sim_info
-
 
 
 def get_osculating_elements(sim_data):
@@ -224,82 +249,19 @@ def get_osculating_elements(sim_data):
     rp = -2.0 * np.sqrt(bigq) * np.cos((theta - 2.0 * np.pi) / 3.0) - a2 / 3.0
     semi_osculating = 2.0 * ra * rp / (ra + rp)
     ecc_osculating = (ra - rp) / (ra + rp)
-    osculating_cutoff  = -1 if not np.any(np.isnan(semi_osculating)) else np.where(np.isnan(semi_osculating))[0][0]
+    osculating_cutoff = (
+        -1
+        if not np.any(np.isnan(semi_osculating))
+        else np.where(np.isnan(semi_osculating))[0][0]
+    )
     cutoff_index = np.searchsorted(
         sim_data["times"],
-        sim_data["turn_on_time"] + 2. * sim_data["turn_on_interval"],
+        sim_data["turn_on_time"] + 2.0 * sim_data["turn_on_interval"],
     )
-    return ra[cutoff_index:osculating_cutoff], rp[cutoff_index:osculating_cutoff], semi_osculating[cutoff_index:osculating_cutoff], ecc_osculating[cutoff_index:osculating_cutoff], sim_data["times"][cutoff_index:osculating_cutoff]
-
-
-
-def splines(sim_data, to_isco=False):
-    cutoff_index = np.searchsorted(
-        sim_data["times"], sim_data["turn_on_time"] + 1.0 * sim_data["turn_on_interval"]
+    return (
+        ra[cutoff_index:osculating_cutoff],
+        rp[cutoff_index:osculating_cutoff],
+        semi_osculating[cutoff_index:osculating_cutoff],
+        ecc_osculating[cutoff_index:osculating_cutoff],
+        sim_data["times"][cutoff_index:osculating_cutoff],
     )
-    radii_spline = InterpolatedUnivariateSpline(sim_data["times"], sim_data["radii"])
-
-    isco_index = np.argmax(sim_data["radii"] < 7.1) if to_isco else -1
-    psi_spline = InterpolatedUnivariateSpline(
-        sim_data["angular_vel"][cutoff_index:isco_index],
-        sim_data["dphi"][cutoff_index:isco_index],
-        ext=1,
-    )
-
-    time_spline = InterpolatedUnivariateSpline(
-        # -sim_data["radii"][cutoff_index + 50 : -20],
-        -(sim_data["angular_vel"] ** (-2 / 3))[cutoff_index:isco_index],
-        sim_data["times"][cutoff_index:isco_index],
-    )
-    phases_spline = InterpolatedUnivariateSpline(
-        sim_data["angular_vel"][cutoff_index:isco_index],
-        sim_data["phases"][cutoff_index:isco_index],
-        check_finite=True,
-    )
-    phases_time_spline = InterpolatedUnivariateSpline(
-        sim_data["times"], sim_data["phases"], ext=1
-    )
-    return (radii_spline, phases_spline, psi_spline, time_spline, phases_time_spline)
-
-
-def ecc_splines(sim_data, to_isco=False):
-    cutoff_index = np.searchsorted(
-        sim_data["times"], sim_data["turn_on_time"] + 1.0 * sim_data["turn_on_interval"]
-    )
-    radii_spline = InterpolatedUnivariateSpline(sim_data["times"], sim_data["radii"])
-    psi_spline = InterpolatedUnivariateSpline(
-        sim_data["times"],
-        sim_data["psi0"],
-        ext=1,
-    )
-    omegadot_spline = InterpolatedUnivariateSpline(
-        sim_data["times"],
-        sim_data["angular_acc"],
-        ext=1,
-    )
-    return radii_spline, psi_spline, omegadot_spline
-
-
-def cov_derivative(sim_data):
-    g00, gi0, gij = background(sim_data["position"])
-    g_mu_nu = np.empty((np.shape(g00)[0], 4, 4))
-    g_mu_nu[:, 0, 0] = g00
-    g_mu_nu[:, 1:4, 0] = gi0
-    g_mu_nu[:, 0, 1:4] = gi0
-    g_mu_nu[:, 1:4, 1:4] = gij
-
-    coef_data = sim_data["all_coef_data"]
-    d_mu_psi = np.concatenate((coef_data[:, 14:15], coef_data[:, 11:14]), axis=1)
-    cov_derivative = np.einsum("...ij,...i,...j->...", g_mu_nu, d_mu_psi, d_mu_psi)
-    """
-    vel = sim_data["velocity"]
-    coef_data = sim_data["all_coef_data"]
-    cov_derivative = np.einsum("...,...j", sim_data["dtpsi0"], gi0) - np.einsum(
-        "...,...,...j", g00, sim_data["dtpsi0"], vel
-    )
-    cov_derivative += np.einsum(
-        "...ij,...j->...i", gij, coef_data[:, 11:14]
-    ) - np.einsum("...i,...j,...j->...i", vel, gi0, coef_data[:, 11:14])
-    """
-    return np.sqrt(cov_derivative)
-
