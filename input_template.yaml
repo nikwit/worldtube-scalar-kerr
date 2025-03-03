@@ -230,11 +230,13 @@ Worldtube:
       EvenlySpaced:
         Interval: {{ylm_obs_interval}}
         Offset: 0
+  Verbosity: Quiet
+
 InterpolationTargets:
   Spheres:
     LMax: 10
     Center: [0.,0.,0.]
-    Radius: [500., 800.]
+    Radius: [800.]
     AngularOrdering: Strahlkorper
 
 Filtering:
