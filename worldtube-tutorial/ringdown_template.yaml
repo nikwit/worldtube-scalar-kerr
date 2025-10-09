@@ -1,0 +1,145 @@
+# Distributed under the MIT License.
+# See LICENSE.txt for details.
+
+Executable: EvolveCurvedScalarWaveKerrSchild3D
+Testing:
+  Check: parse
+
+---
+
+
+Parallelization:
+  ElementDistribution: NumGridPoints
+
+
+InitialData:
+  NumericInitialData:
+    FileGlob: {{file_path}}
+    Subgroup: "InsideHorizon"
+    ObservationValue: Last
+    ObservationValueEpsilon: Auto
+    ElementsAreIdentical: false
+    Variables:
+      Psi: "Psi"
+      Pi: "Pi"
+      Phi: "Phi"
+
+
+BackgroundSpacetime:
+  KerrSchild:
+    Mass: 1.
+    Center: [0., 0., 0.]
+    Spin: [0., 0., 0.]
+    Velocity: [0.,0.,0.]
+
+ResourceInfo:
+  AvoidGlobalProc0: false
+  Singletons: Auto
+
+PhaseChangeAndTriggers:
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.0002
+  MinimumTimeStep: 1e-9
+  InitialSlabSize: 0.1
+  VariableOrderAlgorithm:
+    GoalOrder: 4
+  StepChoosers:
+    - LimitIncrease:
+        Factor: 2
+    - PreventRapidIncrease
+    - ErrorControl:
+        AbsoluteTolerance: 1e-8
+        RelativeTolerance: 1e-6
+        MaxFactor: 2
+        MinFactor: 0.25
+        SafetyFactor: 0.95
+  # Found that order 4 offers a significant speedup compared to order 5
+  TimeStepper:
+    AdamsMoultonPcMonotonic:
+      Order: 4
+
+DomainCreator:
+  Sphere:
+    InnerRadius: 1.995
+    OuterRadius: 890.
+    Interior:
+      ExciseWithBoundaryCondition: DemandOutgoingCharSpeeds
+    InitialRefinement:
+      Shell0: [2, 2, 3]
+      Shell1: [2, 2, 3]
+      Shell2: [1, 1, 6]
+    InitialGridPoints: 
+      Shell0: [12, 12, 13]
+      Shell1: [13, 13, 13]
+      Shell2: [13, 13, 12] 
+    UseEquiangularMap: true
+    EquatorialCompression:
+      AspectRatio: 1.
+      IndexPolarAxis: 0
+    RadialPartitioning: [10., 50.]
+    RadialDistribution: [Linear, Linear, Linear]
+    WhichWedges: All
+    TimeDependentMaps: None
+    OuterBoundaryCondition: ConstraintPreservingSphericalRadiation
+
+
+SpatialDiscretization:
+  BoundaryCorrection:
+    UpwindPenalty:
+  DiscontinuousGalerkin:
+    Formulation: StrongInertial
+    Quadrature: GaussLobatto
+
+EventsAndTriggersAtSlabs:
+  - Trigger:
+      Slabs:
+        Specified: 
+          Values: [0]
+    Events:
+      - ChangeSlabSize:
+          DelayChange: 0
+          StepChoosers:
+            - Cfl:
+                SafetyFactor: 1.5
+  - Trigger:
+      TimeCompares:
+        Comparison: GreaterThan
+        Value: 2000.
+    Events:
+      - Completion
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 20
+          Offset: 0
+    Events:
+      - SphericalSurface
+
+
+InterpolationTargets:
+  SphericalSurface:
+    LMax: 10
+    Center: [0.,0.,0.]
+    Radius: [850.]
+    AngularOrdering: Strahlkorper
+
+
+Interpolator:
+  Verbosity: Silent
+
+EventsAndTriggersAtSteps:
+
+Filtering:
+  ExpFilter0:
+    Alpha: 12
+    HalfPower: 32
+    Enable: true
+    BlocksToFilter: All
+
+EventsAndDenseTriggers:
+
+Observers:
+  VolumeFileName: "Volume"
+  ReductionFileName: "Reductions"

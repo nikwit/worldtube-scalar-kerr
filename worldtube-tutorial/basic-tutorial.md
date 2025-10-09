@@ -104,6 +104,8 @@ Create a new directory on urania. Ideal for this is `/urania/ptmp/`, do not use 
 ## Restarting a simulation
 On urania, simulations can only go run at most 24 hours. The executable will therefore write a checkpoint just before that time. To restart a simulation, it is easiest to use the `restart_job.py` script and simply running `python restart_job.py /path/to/simulation`. 
 
+## Running a ringdown
+The simulation is set to terminate once the worldtube is fully inside a sphere with areal radius 1.99 M. At this point, we dump volume data from the entire simulation. Since the worldtube is entirely inside the horizon of the central black hole, it is causally disconnected from the rest of the domain. We can therefore start a simulation on a new domain that just includes a single excision sphere with radius 1.995 M. The data gets interpolated onto this new grid automatically. The ringdown is done with a different executable, *EvolveCurvedScalarWaveKerrSchild3D* that needs to be compiled (**Note that applying the speedup.patch from below will break this executable!**). I have included an example auxiliary file `ringdown_template.yaml`, as well as a launch script (usage: `python launch_ringdown.py /path/to/simulation/folder`) and a submit script `ringdown_launch_template.sh`. The python and shell file are implemented for CaltechHPC and will need to be adjusted to your cluster, but they are pretty short and simple.
 
 ## Analyzing a simulation
 The simulations are in analyzed with python bindings. First, the bindings have to be compiled using `ninja all-pybindings` in your build directory. The libraries created then have to be added to your `PYTHONPATH` so python knows where to look for them. The path is given by `your_build_directory/bin/python`. 
