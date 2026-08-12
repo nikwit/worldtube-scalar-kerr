@@ -127,11 +127,11 @@ def submit_job(
         # the initial radius of the orbit
         "orbit_radius": orbit_radius,
         # the worldtube radius at apastron
-        "worldtube_radius": worldtube_radius,
+        "worldtube_radius": float(worldtube_radius),
         # the angular velocity, needed by the rotation map
-        "angular_vel": initial_velocity / orbit_radius,
+        "angular_vel": float(initial_velocity / orbit_radius),
         "particle_position": [orbit_radius, 0.0, 0.0],
-        "particle_velocity": [0.0, initial_velocity, 0.0],
+        "particle_velocity": [0.0, float(initial_velocity), 0.0],
         # the slab interval where volume data is observed
         "observe_volume_interval": 20000,
         # the slab interval indicating how often data about the charge is observed
@@ -145,17 +145,17 @@ def submit_job(
         # expansion order of the worldtube scheme
         "expansion_order": expansion_order,
         # when the self force is turned on
-        "turn_on_time": num_geodesic_orbits * radial_period - 100.0,
+        "turn_on_time": float(num_geodesic_orbits * radial_period - 100.0),
         # the interval over which the self force is turned on
         "turn_on_interval": 100.0,
         # how many iterations are done
         "iterations": iterations,
         # sets the parameters of the function that controls the excision sphere radii
-        "r0": r0,
+        "r0": float(r0),
         "amp": amp,
         "exp": 1.5,
         "delta": 0.05,
-        "r0_bh": r0_bh,
+        "r0_bh": float(r0_bh),
         "amp_bh": amp_bh,
         "exp_bh": 1.0,
         "delta_bh": 0.05,

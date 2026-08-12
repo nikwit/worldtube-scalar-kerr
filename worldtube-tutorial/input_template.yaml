@@ -1,14 +1,16 @@
 # Distributed under the MIT License.
 # See LICENSE.txt for details.
 
-# Executable: EvolveWorldtubeCurvedScalarWaveKerrSchild3D
-# Check: parse
+Executable: EvolveWorldtubeCurvedScalarWaveKerrSchild3D
+Testing:
+  Check: parse
+
 ---
----
+
 Parallelization:
   ElementDistribution: NumGridPoints
 
-AnalyticData:
+InitialData:
   ZerothOrderPuncture:
     ParticlePosition: {{particle_position}}
     ParticleVelocity: {{particle_velocity}}
@@ -43,9 +45,14 @@ PhaseChangeAndTriggers:
 
 Evolution:
   InitialTime: 0.0
-  InitialTimeStep: 0.000001
-  TimeStepper: Rk4Owren
+  InitialTimeStep: &initial_time_step 0.000001
+  InitialSlabSize: *initial_time_step
   MinimumTimeStep: 1e-10
+  LocalTimeStepping: Off
+  TimeStepper: Rk4Owren
+  LtsStepChoosers:
+  VariableOrderAlgorithm:
+    GoalOrder: 4
 
 DomainCreator:
   BinaryCompactObject:
@@ -55,16 +62,16 @@ DomainCreator:
       ObjectACube: [1, 1, 1]
       ObjectBCube: [2, 2, 1]
       Envelope: [1, 1, 4]
-      OuterShell: [1, 1, 5]
+      OuterShell0: [1, 1, 5]
     InitialGridPoints:
       ObjectAShell: [{{10 + P}}, {{10 + P}}, {{11 + P}}]
       ObjectBShell: [{{10 + P}}, {{10 + P}}, {{12 + P}}]
-      ObjectACube: [{{11 + P}}, {{11 + P}}, {{10+ P}}]
+      ObjectACube: [{{11 + P}}, {{11 + P}}, {{10 + P}}]
       ObjectBCube: [{{10 + P}}, {{10 + P}}, {{11 + P}}]
       Envelope: [{{12 + P}}, {{12 + P}}, {{12 + P}}]
-      OuterShell: [{{10 + P}}, {{10 + P}}, {{10 + P}}]
+      OuterShell0: [{{10 + P}}, {{10 + P}}, {{10 + P}}]
     UseEquiangularMap: true
-    CenterOfMassOffset: [0.,0.]
+    CenterOfMassOffset: [0., 0.]
     ObjectB:
       InnerRadius: 1.9
       OuterRadius: 10.
@@ -84,10 +91,13 @@ DomainCreator:
       Radius: 400.
     OuterShell:
       Radius: 900.
+      RadialPartitioning: []
       RadialDistribution: Linear
       OpeningAngle: 120.0
+      UseSphericalHarmonics: false
       BoundaryCondition: ConstraintPreservingSphericalRadiation
     CubeScale: 1.0
+    UseWorldtube: true
     TimeDependentMaps:
       InitialTime: 0.
       ExpansionMap:
@@ -100,14 +110,17 @@ DomainCreator:
       SkewMap: None
       ShapeMapA:
         LMax: 2
-        InitialValues: Spherical
-        SizeInitialValues: [0.0, 0.0, 0.0]
-        TransitionEndsAtCube: true      
-      ShapeMapB:
-        LMax: 2
+        CoefficientTruncationLimit: 0.
         InitialValues: Spherical
         SizeInitialValues: [0.0, 0.0, 0.0]
         TransitionEndsAtCube: true
+      ShapeMapB:
+        LMax: 2
+        CoefficientTruncationLimit: 0.
+        InitialValues: Spherical
+        SizeInitialValues: [0.0, 0.0, 0.0]
+        TransitionEndsAtCube: true
+      GridCenters: None
 
 SpatialDiscretization:
   BoundaryCorrection:
@@ -115,6 +128,17 @@ SpatialDiscretization:
   DiscontinuousGalerkin:
     Formulation: StrongInertial
     Quadrature: GaussLobatto
+    Filtering:
+      - Hypercube:
+          HalfPower: 32
+          Enable: true
+          BlocksToFilter: All
+          VolumeFilterOnSubstep: true
+          BoundaryCorrectionFilterOnSubstep: false
+          VolumeFilterEveryNSteps: None
+          BoundaryCorrectionFilterEveryNSteps: None
+
+EventsAndTriggersAtCheckpoints:
 
 EventsAndTriggersAtSlabs:
   - Trigger:
@@ -128,6 +152,7 @@ EventsAndTriggersAtSlabs:
             - Phi
             - OneIndexConstraint
           InterpolateToMesh: None
+          ProjectToMesh: None
           CoordinatesFloatingPointType: Double
           FloatingPointTypes: [Double]
           BlocksToObserve: All
@@ -144,6 +169,7 @@ EventsAndTriggersAtSlabs:
             - Psi
             - OneIndexConstraint
           InterpolateToMesh: None
+          ProjectToMesh: None
           CoordinatesFloatingPointType: Float
           FloatingPointTypes: [Float]
           BlocksToObserve: All
@@ -156,7 +182,7 @@ EventsAndTriggersAtSlabs:
       - Spheres
   - Trigger:
       Slabs:
-        Specified: 
+        Specified:
           Values: [0]
     Events:
       - ChangeSlabSize:
@@ -175,7 +201,7 @@ EventsAndTriggersAtSlabs:
                 SafetyFactor: 1.6
   - Trigger:
       OrbitRadius:
-          Radii: [ 70., 60., 55., 52.,  50., 48., 45., 42., 40.]
+          Radii: [70., 60., 55., 52., 50., 48., 45., 42., 40.]
     Events:
       - ChangeSlabSize:
           DelayChange: 0
@@ -184,7 +210,7 @@ EventsAndTriggersAtSlabs:
                 SafetyFactor: 1.4
   - Trigger:
       OrbitRadius:
-          Radii: [38., 36., 34., 32., 30., 28., 26., 24., 22., 20., 19., 18., 17., 16., 15., 13.5, 13., 12.5, 12., 11.5, 11., 10.5, 10., 9.5, 9., 8.5, 8., 7.5,7., 6.75, 6.5, 6.25, 6., 5.75, 5.5, 5.25,  5., 4.75, 4.5, 4.25, 4., 3.75, 3.5, 3.25]
+          Radii: [38., 36., 34., 32., 30., 28., 26., 24., 22., 20., 19., 18., 17., 16., 15., 13.5, 13., 12.5, 12., 11.5, 11., 10.5, 10., 9.5, 9., 8.5, 8., 7.5, 7., 6.75, 6.5, 6.25, 6., 5.75, 5.5, 5.25, 5., 4.75, 4.5, 4.25, 4., 3.75, 3.5, 3.25]
     Events:
       - ChangeSlabSize:
           DelayChange: 0
@@ -206,23 +232,28 @@ EventsAndTriggersAtSlabs:
     Events:
       - Completion
 
+EventsAndTriggersAtSteps:
+
 Worldtube:
   ExcisionSphere: ExcisionSphereA
-  ExpansionOrder: {{expansion_order}}
+  PunctureField:
+    Schwarzschild:
+      ExpansionOrder: {{expansion_order}}
+      BlackHoleMass: 1.0
+  Charge: {{particle_charge}}
   SelfForceOptions:
     Iterations: {{iterations}}
     Mass: {{particle_charge}}
     TurnOnTime: {{turn_on_time}}
     TurnOnInterval: {{turn_on_interval}}
-  Charge: {{particle_charge}}
   WorldtubeRadiusOptions:
     Amplitude: {{amp}}
-    TransitionRadius: {{rb}}
+    TransitionRadius: {{r0}}
     TransitionWidth: {{delta}}
     Exponent: {{exp}}
   BlackHoleRadiusOptions:
     Amplitude: {{amp_bh}}
-    TransitionRadius: {{rb_bh}}
+    TransitionRadius: {{r0_bh}}
     TransitionWidth: {{delta_bh}}
     Exponent: {{exp_bh}}
   ObserveCoefficientsTrigger:
@@ -232,19 +263,15 @@ Worldtube:
         Offset: 0
   Verbosity: Quiet
 
+Interpolator:
+  Verbosity: Silent
+
 InterpolationTargets:
   Spheres:
     LMax: 10
-    Center: [0.,0.,0.]
+    Center: [0., 0., 0.]
     Radius: [800.]
     AngularOrdering: Strahlkorper
-
-Filtering:
-  ExpFilter0:
-    Alpha: 12
-    HalfPower: 32
-    Enable: true
-    BlocksToFilter: All
 
 EventsAndDenseTriggers:
 
